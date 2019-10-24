@@ -5,26 +5,22 @@ import argparse
 import csv
 import json
 import os
-import shutil
 import subprocess as sp
 import tempfile
 from collections import namedtuple
-
 
 OP_BIN = 'op'
 GPG_BIN = 'gpg'
 TAR_BIN = 'tar'
 
-
 Record = namedtuple('Record', [
-    'title', 
+    'title',
     'username',
     'password',
     'url',
 ])
 
 Vault = namedtuple('Vault', ['title', 'records'])
-    
 
 DUMMY_RECORD_SET = [
     Record(
@@ -87,8 +83,8 @@ def process_vault(vault):
 
 def save_vault(base_dir, vault):
     file_name = os.path.join(base_dir, vault.title.lower())
-    with open(file_name, 'w') as csvfile:
-        record_writer = csv.writer(csvfile)
+    with open(file_name, 'w') as csv_file:
+        record_writer = csv.writer(csv_file)
         for record in vault.records:
             record_writer.writerow([
                 record.title,
@@ -108,8 +104,8 @@ def export_encrypted(dir_path, file_name, password):
         tar_name = os.path.join(tar_dir_path, os.path.basename(file_name) + '.tar')
         print('Store temp tar in ' + tar_name)
         sp.run([TAR_BIN, '-cf', tar_name, '-C', dir_path, '.'])
-        sp.run([GPG_BIN, '--symmetric', '--batch', '--yes', '--passphrase', password, 
-            '--output', gpg_name, tar_name])
+        sp.run([GPG_BIN, '--symmetric', '--batch', '--yes', '--passphrase', password,
+                '--output', gpg_name, tar_name])
 
 
 def retrieve_vaults():
@@ -118,7 +114,7 @@ def retrieve_vaults():
     return data
 
 
-def retrieve_items(vault_uuid): 
+def retrieve_items(vault_uuid):
     data = catch_op_json([OP_BIN, 'list', 'items', '--vault=' + vault_uuid])
     return data
 
@@ -150,7 +146,7 @@ def value_from_fields(item_fields, key):
 
 
 def catch_op_json(args):
-    output = sp.run(args, check=True, stdout=sp.PIPE).stdout    
+    output = sp.run(args, check=True, stdout=sp.PIPE).stdout
     return json.loads(output.decode('utf-8'))
 
 
