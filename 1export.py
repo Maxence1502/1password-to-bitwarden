@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import argparse
 import csv
 import json
 import os
@@ -37,6 +38,8 @@ DUMMY_RECORD_SET = [
 
 
 def main():
+    args = parse_args()
+    output_file_name = os.path.abspath(args.file_name)
     vaults = [process_vault(v) for v in retrieve_vaults()]
     # vaults = [
     #     Vault(title='t1', records=DUMMY_RECORD_SET),
@@ -48,8 +51,20 @@ def main():
         print('Store temp files in {}'.format(dir_path))
         for vault in vaults:
             save_vault(dir_path, vault)
-        encrypt_saved_data(dir_path, 'export', '123')
+        if args.password:
+            export_encrypted(dir_path, output_file_name, args.password)
+        else:
+            export_plain(dir_path, output_file_name)
     print('Done')
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Export 1password logins')
+    parser.add_argument('file_name', type=str,
+                        help='output file name')
+    parser.add_argument('--password', dest='password',
+                        help='encrypt data')
+    return parser.parse_args()
 
 
 def process_vault(vault):
@@ -83,11 +98,15 @@ def save_vault(base_dir, vault):
             ])
 
 
-def encrypt_saved_data(dir_path, file_name, password):
+def export_plain(dir_path, file_name):
+    sp.run([TAR_BIN, '-cf', file_name + '.tar', '-C', dir_path, '.'])
+
+
+def export_encrypted(dir_path, file_name, password):
     gpg_name = file_name + '.tar.gpg'
     with tempfile.TemporaryDirectory(suffix='-one-password-export') as tar_dir_path:
-        print('Store temp tar in ' + tar_dir_path)
-        tar_name = os.path.join(tar_dir_path, file_name + '.tar')
+        tar_name = os.path.join(tar_dir_path, os.path.basename(file_name) + '.tar')
+        print('Store temp tar in ' + tar_name)
         sp.run([TAR_BIN, '-cf', tar_name, '-C', dir_path, '.'])
         sp.run([GPG_BIN, '--symmetric', '--batch', '--yes', '--passphrase', password, 
             '--output', gpg_name, tar_name])
