@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-from collections import namedtuple
-import subprocess as sp
-import pprint
-import json
-import logging
-import tempfile
-import os
 import csv
-
-
-logging.basicConfig(level=logging.INFO)
+import json
+import os
+import shutil
+import subprocess as sp
+import tempfile
+from collections import namedtuple
 
 
 OP_BIN = 'op'
-ZIP_BIN = 'zip'
+GPG_BIN = 'gpg'
+TAR_BIN = 'tar'
+
 
 Record = namedtuple('Record', [
     'title', 
@@ -25,6 +24,7 @@ Record = namedtuple('Record', [
 
 Vault = namedtuple('Vault', ['title', 'records'])
     
+
 DUMMY_RECORD_SET = [
     Record(
         title='title' + str(i),
@@ -35,26 +35,38 @@ DUMMY_RECORD_SET = [
     for i in range(10)
 ]
 
+
 def main():
-    # dir_path = tempfile.mkdtemp(suffix='password-export')
-    dir_path = './tmp'
-    vaults = [Vault(title='test', records=DUMMY_RECORD_SET)]
-    for vault in vaults:
-        save_vault(dir_path, vault)
+    vaults = [process_vault(v) for v in retrieve_vaults()]
+    # vaults = [
+    #     Vault(title='t1', records=DUMMY_RECORD_SET),
+    #     Vault(title='t2', records=DUMMY_RECORD_SET),
+    #     Vault(title='t3', records=DUMMY_RECORD_SET),
+    #     Vault(title='t4', records=DUMMY_RECORD_SET),
+    # ]
+    with tempfile.TemporaryDirectory(suffix='-one-password-export') as dir_path:
+        print('Store temp files in {}'.format(dir_path))
+        for vault in vaults:
+            save_vault(dir_path, vault)
+        encrypt_saved_data(dir_path, 'export', '123')
+    print('Done')
 
 
 def process_vault(vault):
     vault_uuid = vault['uuid']
     vault_name = vault['name']
-    logging.info('Vault "{}": Fetch items'.format(vault_name))
+    str_v = lambda v, m: '\rVault "{}": {:20}'.format(v, m)
+    str_vr = lambda v, i, t: str_v(v, '{}/{}'.format(i, t))
+    print(str_v(vault_name, 'fetch items'), end='')
     items = retrieve_items(vault_uuid)
     records = []
-    logging.info('Vault "{}": {}/{}'.format(vault_name, 0, len(items)))
+    print(str_vr(vault_name, 0, len(items)), end='')
     for index, item in enumerate(items):
         item_data = retrieve_item(item['uuid'])
         extracted = extract_item_fields(item_data)
         records.append(extracted)
-        logging.info('Vault "{}": {}/{}'.format(vault_name, index + 1, len(items)))
+        print(str_vr(vault_name, index + 1, len(items)), end='')
+    print('')
     return Vault(title=vault_name, records=records)
 
 
@@ -71,9 +83,21 @@ def save_vault(base_dir, vault):
             ])
 
 
+def encrypt_saved_data(dir_path, file_name, password):
+    gpg_name = file_name + '.tar.gpg'
+    with tempfile.TemporaryDirectory(suffix='-one-password-export') as tar_dir_path:
+        print('Store temp tar in ' + tar_dir_path)
+        tar_name = os.path.join(tar_dir_path, file_name + '.tar')
+        sp.run([TAR_BIN, '-cf', tar_name, '-C', dir_path, '.'])
+        sp.run([GPG_BIN, '--symmetric', '--batch', '--yes', '--passphrase', password, 
+            '--output', gpg_name, tar_name])
+
+
 def retrieve_vaults():
+    print('Fetch vault list')
     data = catch_op_json([OP_BIN, 'list', 'vaults'])
     return data
+
 
 def retrieve_items(vault_uuid): 
     data = catch_op_json([OP_BIN, 'list', 'items', '--vault=' + vault_uuid])
