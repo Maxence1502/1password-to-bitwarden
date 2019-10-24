@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from collections import namedtuple
 import subprocess as sp
 import pprint
 import json
@@ -15,23 +16,31 @@ logging.basicConfig(level=logging.INFO)
 OP_BIN = 'op'
 ZIP_BIN = 'zip'
 
+Record = namedtuple('Record', [
+    'title', 
+    'username',
+    'password',
+    'url',
+])
+
+Vault = namedtuple('Vault', ['title', 'records'])
+    
+DUMMY_RECORD_SET = [
+    Record(
+        title='title' + str(i),
+        username='username' + str(i),
+        password='password' + str(i),
+        url='url' + str(i),
+    )
+    for i in range(10)
+]
 
 def main():
-    dir_path = tempfile.mkdtemp(suffix='password-export')
-    logging.info('Store temp files in ' + dir_path)
-    vaults = retrieve_vaults()
+    # dir_path = tempfile.mkdtemp(suffix='password-export')
+    dir_path = './tmp'
+    vaults = [Vault(title='test', records=DUMMY_RECORD_SET)]
     for vault in vaults:
-        vault_name, records = process_vault(vault)      
-        with open(os.path.join(dir_path, vault_name.lower()), 'w') as csvfile:
-            record_writer = csv.writer(csvfile)
-            for record in records:
-                record_writer.writerow([
-                    record['title'],
-                    record['username'],
-                    record['password'],
-                    record['url']
-                ])
-
+        save_vault(dir_path, vault)
 
 
 def process_vault(vault):
@@ -46,36 +55,48 @@ def process_vault(vault):
         extracted = extract_item_fields(item_data)
         records.append(extracted)
         logging.info('Vault "{}": {}/{}'.format(vault_name, index + 1, len(items)))
-    return vault_name, records
+    return Vault(title=vault_name, records=records)
+
+
+def save_vault(base_dir, vault):
+    file_name = os.path.join(base_dir, vault.title.lower())
+    with open(file_name, 'w') as csvfile:
+        record_writer = csv.writer(csvfile)
+        for record in vault.records:
+            record_writer.writerow([
+                record.title,
+                record.username,
+                record.password,
+                record.url
+            ])
 
 
 def retrieve_vaults():
-    data = catch_op_json(['op', 'list', 'vaults'])
+    data = catch_op_json([OP_BIN, 'list', 'vaults'])
     return data
 
 def retrieve_items(vault_uuid): 
-    data = catch_op_json(['op', 'list', 'items', '--vault=' + vault_uuid])
+    data = catch_op_json([OP_BIN, 'list', 'items', '--vault=' + vault_uuid])
     return data
 
 
 def retrieve_item(item_uuid):
-    data = catch_op_json(['op', 'get', 'item', item_uuid])
+    data = catch_op_json([OP_BIN, 'get', 'item', item_uuid])
     return data
 
 
 def extract_item_fields(item_data):
     details = item_data.get('details', {})
     fields = details.get('fields', [])
-    title = item_data.get('overview', {}).get('title', '')
+    overview = item_data.get('overview', {})
     username = value_from_fields(fields, 'username')
     password = value_from_fields(fields, 'password') or details.get('password', '')
-    url = item_data.get('overview', {}).get('url', '')
-    return {
-        'title': title,
-        'username': username,
-        'password': password,
-        'url': url,
-    }
+    return Record(
+        title=overview.get('title', ''),
+        username=username,
+        password=password,
+        url=overview.get('url', ''),
+    )
 
 
 def value_from_fields(item_fields, key):
