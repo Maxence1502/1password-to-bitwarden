@@ -10,21 +10,15 @@ Requirements:
 -	tar, gpg (for encryption) binaries
 
 First login with `op` client. It exports session key to environment variables.
-More details [signin](here).
+More details [signin](https://developer.1password.com/docs/cli/sign-in-manually).
 	
-	$ eval $(op signin my)
+	$ eval $(op account add --signin --shorthand="value" --address my.1password.com)
+	$ op account list
+	$ eval $(op signin)
 
 Next run script
 
 	$ python3 1export.py <file-name>
-
-If you want encrypt exported data, pass `--password` argument
-
-	$ python3 1export.py --password <password> <file-name> 	
-
-All together in one line:
-
-	$ eval $(op signin my); python3 1export.py --password <password> "/home/av/Dropbox/1password-$(date '+%Y-%m-%d')"
 
 [1password]: http://1password.com/
 [client]: https://1password.com/downloads/command-line/
