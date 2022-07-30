@@ -14,15 +14,17 @@ GPG_BIN = 'gpg'
 TAR_BIN = 'tar'
 
 Record = namedtuple('Record', [
-    'Title',
-    'Url',
-    'Username',
-    'Password',
-    'OTPAuth',
-    'Favorite',
-    'Archived',
-    'Tags',
-    'Notes',
+    "folder",
+    "favorite",
+    "type",
+    "name",
+    "notes",
+    "fields",
+    "reprompt",
+    "login_uri",
+    "login_username",
+    "login_password",
+    "login_totp"
 ])
 
 Vault = namedtuple('Vault', ['title', 'records'])
@@ -61,7 +63,7 @@ def process_vault(vault):
     print(str_v(vault_name, 'fetch items'), end='')
     items = retrieve_items(vault_uuid)
     records = []
-    records.append(Record("Title","Url","Username","Password","OTPAuth","Favorite","Archived","Tags","Notes"))
+    records.append(Record("folder","favorite","type","name","notes","fields","reprompt","login_uri","login_username","login_password","login_totp"))
     print(str_vr(vault_name, 0, len(items)), end='')
     for index, item in enumerate(items):
         item_data = retrieve_item(item['id'])
@@ -78,15 +80,16 @@ def save_vault(base_dir, vault):
         record_writer = csv.writer(csv_file)
         for record in vault.records:
             record_writer.writerow([
-                record.Title,
-                record.Url,
-                record.Username,
-                record.Password,
-                record.OTPAuth,
-                record.Favorite,
-                record.Archived,
-                record.Tags,
-                record.Notes
+                record.folder,
+                record.favorite,
+                record.type,
+                record.name,
+                record.notes,
+                record.fields,
+                record.login_uri,
+                record.login_username,
+                record.login_password,
+                record.login_totp
             ])
 
 
@@ -123,15 +126,17 @@ def retrieve_item(item_uuid):
 def extract_item_fields(item_data):
     fields = item_data.get('fields', [])
     return Record(
-        Title=item_data.get('title', ''),
-        Url=(item_data.get('urls', [])[0]["href"] if item_data.get('urls', [])[0] else ''),
-        Username=value_from_fields(fields, 'username').strip(),
-        Password=value_from_fields(fields, 'password').strip(),
-        OTPAuth="",
-        Favorite="false",
-        Archived="false",
-        Tags="",
-        Notes=value_from_fields(fields, 'notesPlain')
+        folder=(item_data.get('vault', {})).get('name', ''),
+        favorite="",
+        type=item_data.get('category', '').lower(),
+        name=item_data.get('title', ''),
+        notes=value_from_fields(fields, 'notesPlain'),
+        fields="",
+        reprompt=0,
+        login_uri=item_data.get('urls', [])[0].get("href", ""),
+        login_username=value_from_fields(fields, 'username').strip(),
+        login_password=value_from_fields(fields, 'password').strip(),
+        login_totp=""
     )
 
 
