@@ -14,35 +14,25 @@ GPG_BIN = 'gpg'
 TAR_BIN = 'tar'
 
 Record = namedtuple('Record', [
-    'title',
-    'username',
-    'password',
-    'url',
+    'Title',
+    'Url',
+    'Username',
+    'Password',
+    'OTPAuth',
+    'Favorite',
+    'Archived',
+    'Tags',
+    'Notes',
 ])
 
 Vault = namedtuple('Vault', ['title', 'records'])
-
-DUMMY_RECORD_SET = [
-    Record(
-        title='title' + str(i),
-        username='username' + str(i),
-        password='password' + str(i),
-        url='url' + str(i),
-    )
-    for i in range(10)
-]
 
 
 def main():
     args = parse_args()
     output_file_name = os.path.abspath(args.file_name)
     vaults = [process_vault(v) for v in retrieve_vaults()]
-    # vaults = [
-    #     Vault(title='t1', records=DUMMY_RECORD_SET),
-    #     Vault(title='t2', records=DUMMY_RECORD_SET),
-    #     Vault(title='t3', records=DUMMY_RECORD_SET),
-    #     Vault(title='t4', records=DUMMY_RECORD_SET),
-    # ]
+
     with tempfile.TemporaryDirectory(suffix='-one-password-export') as dir_path:
         print('Store temp files in {}'.format(dir_path))
         for vault in vaults:
@@ -64,16 +54,17 @@ def parse_args():
 
 
 def process_vault(vault):
-    vault_uuid = vault['uuid']
+    vault_uuid = vault['id']
     vault_name = vault['name']
     str_v = lambda v, m: '\rVault "{}": {:20}'.format(v, m)
     str_vr = lambda v, i, t: str_v(v, '{}/{}'.format(i, t))
     print(str_v(vault_name, 'fetch items'), end='')
     items = retrieve_items(vault_uuid)
     records = []
+    records.append(Record("Title","Url","Username","Password","OTPAuth","Favorite","Archived","Tags","Notes"))
     print(str_vr(vault_name, 0, len(items)), end='')
     for index, item in enumerate(items):
-        item_data = retrieve_item(item['uuid'])
+        item_data = retrieve_item(item['id'])
         extracted = extract_item_fields(item_data)
         records.append(extracted)
         print(str_vr(vault_name, index + 1, len(items)), end='')
@@ -87,10 +78,15 @@ def save_vault(base_dir, vault):
         record_writer = csv.writer(csv_file)
         for record in vault.records:
             record_writer.writerow([
-                record.title,
-                record.username,
-                record.password,
-                record.url
+                record.Title,
+                record.Url,
+                record.Username,
+                record.Password,
+                record.OTPAuth,
+                record.Favorite,
+                record.Archived,
+                record.Tags,
+                record.Notes
             ])
 
 
@@ -110,37 +106,38 @@ def export_encrypted(dir_path, file_name, password):
 
 def retrieve_vaults():
     print('Fetch vault list')
-    data = catch_op_json([OP_BIN, 'list', 'vaults'])
+    data = catch_op_json([OP_BIN, 'vault', 'list', '--format=json'])
     return data
 
 
 def retrieve_items(vault_uuid):
-    data = catch_op_json([OP_BIN, 'list', 'items', '--vault=' + vault_uuid])
+    data = catch_op_json([OP_BIN, 'item', 'list', '--vault=' + vault_uuid, '--format=json'])
     return data
 
 
 def retrieve_item(item_uuid):
-    data = catch_op_json([OP_BIN, 'get', 'item', item_uuid])
+    data = catch_op_json([OP_BIN, 'item', 'get', item_uuid, '--format=json'])
     return data
 
 
 def extract_item_fields(item_data):
-    details = item_data.get('details', {})
-    fields = details.get('fields', [])
-    overview = item_data.get('overview', {})
-    username = value_from_fields(fields, 'username')
-    password = value_from_fields(fields, 'password') or details.get('password', '')
+    fields = item_data.get('fields', [])
     return Record(
-        title=overview.get('title', ''),
-        username=username,
-        password=password,
-        url=overview.get('url', ''),
+        Title=item_data.get('title', ''),
+        Url=(item_data.get('urls', [])[0]["href"] if item_data.get('urls', [])[0] else ''),
+        Username=value_from_fields(fields, 'username').strip(),
+        Password=value_from_fields(fields, 'password').strip(),
+        OTPAuth="",
+        Favorite="false",
+        Archived="false",
+        Tags="",
+        Notes=value_from_fields(fields, 'notesPlain')
     )
 
 
 def value_from_fields(item_fields, key):
     for f in item_fields:
-        if f.get('designation', '') == key:
+        if f.get('id', '') == key:
             return f.get('value', '')
     return ''
 
