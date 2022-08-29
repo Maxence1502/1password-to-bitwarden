@@ -133,7 +133,7 @@ def extract_item_fields(item_data):
         notes=value_from_fields(fields, 'notesPlain'),
         fields="",
         reprompt=0,
-        login_uri=item_data.get('urls', [])[0].get("href", ""),
+        login_uri=item_data.get('urls', [])[0].get("href", "") if (len(item_data.get('urls', [])) > 0) else "",
         login_username=value_from_fields(fields, 'username').strip(),
         login_password=value_from_fields(fields, 'password').strip(),
         login_totp=""
