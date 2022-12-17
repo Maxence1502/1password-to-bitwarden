@@ -7,6 +7,7 @@ import json
 import os
 import subprocess as sp
 import tempfile
+import re
 from collections import namedtuple
 
 OP_BIN = 'op'
@@ -114,7 +115,7 @@ def retrieve_vaults():
 
 
 def retrieve_items(vault_uuid):
-    data = catch_op_json([OP_BIN, 'item', 'list', '--vault=' + vault_uuid, '--format=json'])
+    data = catch_op_json([OP_BIN, 'item', 'list', '--vault=' + vault_uuid, '--include-archive', '--format=json'])
     return data
 
 
@@ -136,7 +137,7 @@ def extract_item_fields(item_data):
         login_uri=item_data.get('urls', [])[0].get("href", "") if (len(item_data.get('urls', [])) > 0) else "",
         login_username=value_from_fields(fields, 'username').strip(),
         login_password=value_from_fields(fields, 'password').strip(),
-        login_totp=""
+        login_totp=otp_from_fields(fields),
     )
 
 
@@ -144,6 +145,19 @@ def value_from_fields(item_fields, key):
     for f in item_fields:
         if f.get('id', '') == key:
             return f.get('value', '')
+    return ''
+
+
+def otp_from_fields(item_fields):
+    for f in item_fields:
+        if f.get('type', '') == 'OTP':
+            match = re.findall("(?<=secret=)(.*)(?=\\u0026)", f.get('value', ''))
+
+            if len(match) > 0:
+                return match[0]
+            else:
+                return f.get('value', '')
+
     return ''
 
 
